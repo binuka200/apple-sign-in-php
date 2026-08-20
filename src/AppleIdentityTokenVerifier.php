@@ -18,9 +18,9 @@ final class AppleIdentityTokenVerifier
 
     /** @param string|list<mixed> $audiences */
     public function __construct(
-        private readonly JwksProvider $jwks,
+        JwksProvider $jwks,
         string|array $audiences,
-        private readonly int $leeway = 0,
+        int $leeway = 0,
     ) {
         $audiences = is_string($audiences) ? [$audiences] : $audiences;
         $audiences = array_values(array_filter($audiences, static fn (mixed $value): bool => is_string($value) && $value !== ''));

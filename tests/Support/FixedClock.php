@@ -7,9 +7,9 @@ namespace SafeApple\SignIn\Tests\Support;
 use DateTimeImmutable;
 use SafeApple\SignIn\Contract\Clock;
 
-final readonly class FixedClock implements Clock
+final class FixedClock implements Clock
 {
-    public function __construct(private DateTimeImmutable $time)
+    public function __construct(private readonly DateTimeImmutable $time)
     {
     }
 
