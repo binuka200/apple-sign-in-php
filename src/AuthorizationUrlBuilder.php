@@ -6,13 +6,13 @@ namespace SafeApple\SignIn;
 
 use SafeApple\SignIn\Exception\InvalidConfiguration;
 
-final readonly class AuthorizationUrlBuilder
+final class AuthorizationUrlBuilder
 {
     public const ENDPOINT = 'https://appleid.apple.com/auth/authorize';
 
     public function __construct(
-        private string $clientId,
-        private string $redirectUri,
+        private readonly string $clientId,
+        private readonly string $redirectUri,
     ) {
         if ($clientId === '') {
             throw new InvalidConfiguration('Apple client ID cannot be empty.');

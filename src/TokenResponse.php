@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace SafeApple\SignIn;
 
-final readonly class TokenResponse
+final class TokenResponse
 {
     public function __construct(
-        public string $accessToken,
-        public string $tokenType,
-        public int $expiresIn,
-        public string $identityToken,
-        public ?string $refreshToken,
+        public readonly string $accessToken,
+        public readonly string $tokenType,
+        public readonly int $expiresIn,
+        public readonly string $identityToken,
+        public readonly ?string $refreshToken,
     ) {
     }
 }

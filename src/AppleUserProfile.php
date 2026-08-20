@@ -6,12 +6,12 @@ namespace SafeApple\SignIn;
 
 use SafeApple\SignIn\Exception\InvalidAuthorizationResponse;
 
-final readonly class AppleUserProfile
+final class AppleUserProfile
 {
     public function __construct(
-        public ?string $firstName,
-        public ?string $lastName,
-        public ?string $email,
+        public readonly ?string $firstName,
+        public readonly ?string $lastName,
+        public readonly ?string $email,
     ) {
     }
 

@@ -6,11 +6,11 @@ namespace SafeApple\SignIn;
 
 use SafeApple\SignIn\Exception\StateMismatch;
 
-final readonly class LoginChallenge
+final class LoginChallenge
 {
     public function __construct(
-        public string $state,
-        public string $nonce,
+        public readonly string $state,
+        public readonly string $nonce,
     ) {
         if (strlen($state) < 32 || strlen($nonce) < 32) {
             throw new \InvalidArgumentException('State and nonce must each contain at least 32 characters.');

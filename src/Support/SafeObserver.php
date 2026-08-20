@@ -8,9 +8,9 @@ use SafeApple\SignIn\Contract\Observer;
 use Throwable;
 
 /** Prevents a logging or metrics outage from breaking authentication. */
-final readonly class SafeObserver implements Observer
+final class SafeObserver implements Observer
 {
-    public function __construct(private Observer $observer)
+    public function __construct(private readonly Observer $observer)
     {
     }
 
