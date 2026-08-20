@@ -1,0 +1,47 @@
+{
+    "name": "binuka200/apple-sign-in",
+    "description": "Defensive, framework-neutral Sign in with Apple for PHP: OAuth flow, token verification, revocation, and notifications.",
+    "type": "library",
+    "license": "MIT",
+    "homepage": "https://github.com/binuka200/apple-sign-in-php",
+    "keywords": ["apple", "sign-in", "oauth", "oidc", "jwt"],
+    "support": {
+        "docs": "https://github.com/binuka200/apple-sign-in-php#readme",
+        "issues": "https://github.com/binuka200/apple-sign-in-php/issues",
+        "source": "https://github.com/binuka200/apple-sign-in-php"
+    },
+    "require": {
+        "php": "^8.1",
+        "ext-json": "*",
+        "ext-openssl": "*",
+        "firebase/php-jwt": "^7.0.5",
+        "psr/simple-cache": "^3.0",
+        "symfony/http-client": "^6.4 || ^7.0 || ^8.0",
+        "symfony/http-client-contracts": "^3.4"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^1.12 || ^2.0",
+        "phpunit/phpunit": "^10.5 || ^11.0 || ^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "SafeApple\\SignIn\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SafeApple\\SignIn\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "lint": "@php -r \"foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator('src')) as $f) if ($f->getExtension() === 'php') passthru('php -l '.escapeshellarg($f), $e) || exit($e);\"",
+        "analyse": "phpstan analyse --no-progress --memory-limit=512M --debug",
+        "check": ["@lint", "@analyse", "@test"]
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
