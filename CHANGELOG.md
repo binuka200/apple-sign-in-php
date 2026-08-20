@@ -12,3 +12,4 @@
 - Bounded and cached JWKS retrieval with stale fallback, refresh cooldown, and lock support.
 - First-login profile parsing, telemetry hooks, and framework examples.
 - Expo and React Native integration guide with native iOS and browser-based Android flows.
+- Reproducible lint, static-analysis, test, advisory, and lowest-dependency CI checks.

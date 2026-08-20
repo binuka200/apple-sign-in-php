@@ -35,7 +35,7 @@
     },
     "scripts": {
         "test": "phpunit",
-        "lint": "@php -r \"foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator('src')) as $f) if ($f->getExtension() === 'php') passthru('php -l '.escapeshellarg($f), $e) || exit($e);\"",
+        "lint": "@php tools/lint.php",
         "analyse": "phpstan analyse --no-progress --memory-limit=512M --debug",
         "check": ["@lint", "@analyse", "@test"]
     },
