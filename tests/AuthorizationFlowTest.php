@@ -6,7 +6,9 @@ namespace SafeApple\SignIn\Tests;
 
 use PHPUnit\Framework\TestCase;
 use SafeApple\SignIn\AppleAuthorizationResponse;
+use SafeApple\SignIn\AppleIdentity;
 use SafeApple\SignIn\AuthorizationUrlBuilder;
+use SafeApple\SignIn\Exception\InvalidAuthorizationResponse;
 use SafeApple\SignIn\Exception\StateMismatch;
 use SafeApple\SignIn\LoginChallenge;
 
@@ -44,6 +46,37 @@ final class AuthorizationFlowTest extends TestCase
         self::assertSame('Ada', $response->user->firstName);
         self::assertSame('Lovelace', $response->user->lastName);
         self::assertSame('ada@example.com', $response->user->email);
+        self::assertSame('ada@example.com', $response->user->verifiedEmail(new AppleIdentity(
+            subject: 'apple-subject',
+            audience: 'com.example.web',
+            email: 'ada@example.com',
+            emailVerified: true,
+            isPrivateEmail: false,
+            claims: [],
+        )));
+    }
+
+    public function testItRejectsAProfileEmailThatDoesNotMatchTheVerifiedIdentity(): void
+    {
+        $challenge = new LoginChallenge(str_repeat('s', 32), str_repeat('n', 32));
+        $response = AppleAuthorizationResponse::fromPost([
+            'state' => $challenge->state,
+            'code' => 'code',
+            'id_token' => 'jwt',
+            'user' => '{"email":"tampered@example.com"}',
+        ], $challenge);
+        self::assertNotNull($response->user);
+
+        $this->expectException(InvalidAuthorizationResponse::class);
+        $this->expectExceptionMessage('does not match the verified identity token');
+        $response->user->verifiedEmail(new AppleIdentity(
+            subject: 'apple-subject',
+            audience: 'com.example.web',
+            email: 'signed@example.com',
+            emailVerified: true,
+            isPrivateEmail: false,
+            claims: [],
+        ));
     }
 
     public function testItRejectsCallbackStateMismatchBeforeUsingCredentials(): void

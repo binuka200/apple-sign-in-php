@@ -69,6 +69,37 @@ final class AppleJwksProviderTest extends TestCase
         self::assertSame(1, $client->getRequestsCount());
     }
 
+    public function testItRateLimitsRepeatedFailedForcedRefreshes(): void
+    {
+        $cache = new ArrayCache();
+        $cache->set('safe_apple.sign_in.jwks', $this->keySet, 3600);
+        $client = new MockHttpClient(
+            static fn (): MockResponse => new MockResponse('', ['error' => 'network unavailable']),
+        );
+        $provider = new AppleJwksProvider($cache, $client);
+
+        self::assertSame($this->keySet, $provider->get(true));
+        self::assertSame($this->keySet, $provider->get(true));
+
+        self::assertSame(1, $client->getRequestsCount());
+        self::assertIsInt($cache->get('safe_apple.sign_in.jwks.last_attempt_at'));
+    }
+
+    public function testItAppliesFailedRefreshCooldownToStaleOnlyFallbacks(): void
+    {
+        $cache = new ArrayCache();
+        $cache->set('safe_apple.sign_in.jwks.stale', $this->keySet, 3600);
+        $client = new MockHttpClient(
+            static fn (): MockResponse => new MockResponse('', ['error' => 'network unavailable']),
+        );
+        $provider = new AppleJwksProvider($cache, $client);
+
+        self::assertSame($this->keySet, $provider->get(true));
+        self::assertSame($this->keySet, $provider->get(true));
+
+        self::assertSame(1, $client->getRequestsCount());
+    }
+
     public function testItRejectsAnInvalidJwksDocument(): void
     {
         $client = new MockHttpClient(new MockResponse('{"keys":[]}'));

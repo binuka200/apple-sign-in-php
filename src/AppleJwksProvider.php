@@ -47,16 +47,19 @@ final class AppleJwksProvider implements JwksProvider
     public function get(bool $forceRefresh = false): array
     {
         $cached = $this->cache->get($this->cacheKey);
-        if ($this->isValidKeySet($cached)) {
-            if (!$forceRefresh || $this->refreshIsCoolingDown()) {
-                $this->observer->record('jwks.cache_hit', ['forced' => $forceRefresh]);
-                return $cached;
-            }
+        if ($this->isValidKeySet($cached) && !$forceRefresh) {
+            $this->observer->record('jwks.cache_hit', ['forced' => false]);
+            return $cached;
+        }
+
+        $fallback = $this->fallback($cached);
+        if ($forceRefresh && $fallback !== null && $this->refreshIsCoolingDown()) {
+            $this->observer->record('jwks.cache_hit', ['forced' => true]);
+            return $fallback;
         }
 
         if ($this->refreshLock !== null) {
             if (!$this->refreshLock->acquire()) {
-                $fallback = $this->fallback($cached);
                 if ($fallback !== null) {
                     $this->observer->record('jwks.lock_fallback', ['forced' => $forceRefresh]);
                     return $fallback;
@@ -66,18 +69,25 @@ final class AppleJwksProvider implements JwksProvider
 
             try {
                 $latest = $this->cache->get($this->cacheKey);
-                if ($this->isValidKeySet($latest)
-                    && (!$forceRefresh || $this->refreshIsCoolingDown())
-                ) {
-                    $this->observer->record('jwks.cache_hit_after_lock', ['forced' => $forceRefresh]);
+                if ($this->isValidKeySet($latest) && !$forceRefresh) {
+                    $this->observer->record('jwks.cache_hit_after_lock', ['forced' => false]);
                     return $latest;
                 }
-                return $this->fetch($forceRefresh, $this->isValidKeySet($latest) ? $latest : $cached);
+
+                $latestFallback = $this->fallback($latest) ?? $fallback;
+                if ($forceRefresh && $latestFallback !== null && $this->refreshIsCoolingDown()) {
+                    $this->observer->record('jwks.cache_hit_after_lock', ['forced' => true]);
+                    return $latestFallback;
+                }
+
+                $this->recordRefreshAttempt();
+                return $this->fetch($forceRefresh, $latestFallback ?? $cached);
             } finally {
                 $this->refreshLock->release();
             }
         }
 
+        $this->recordRefreshAttempt();
         return $this->fetch($forceRefresh, $cached);
     }
 
@@ -135,8 +145,25 @@ final class AppleJwksProvider implements JwksProvider
             return false;
         }
 
-        $refreshedAt = $this->cache->get($this->cacheKey.'.refreshed_at');
-        return is_int($refreshedAt) && $refreshedAt > time() - $this->refreshCooldown;
+        $attemptedAt = $this->cache->get($this->cacheKey.'.last_attempt_at');
+        if (!is_int($attemptedAt)) {
+            // Honor the old marker during rolling upgrades.
+            $attemptedAt = $this->cache->get($this->cacheKey.'.refreshed_at');
+        }
+        return is_int($attemptedAt) && $attemptedAt > time() - $this->refreshCooldown;
+    }
+
+    private function recordRefreshAttempt(): void
+    {
+        if ($this->refreshCooldown === 0) {
+            return;
+        }
+
+        $this->cache->set(
+            $this->cacheKey.'.last_attempt_at',
+            time(),
+            $this->refreshCooldown,
+        );
     }
 
     /** @phpstan-assert-if-true array{keys: list<array<string, mixed>>} $value */

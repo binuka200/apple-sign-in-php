@@ -14,7 +14,8 @@ or database records; those decisions remain in your application.
 - Authorization-code exchange, refresh-token validation, and token revocation.
 - RS256 identity-token verification with issuer, audience, time, subject, and
   optional nonce validation.
-- First-authorization name and email parsing.
+- First-authorization name and email parsing, explicitly treated as
+  browser-posted profile data rather than identity proof.
 - Side-effect-free typed server notification verification for account deletion,
   revoked consent, and private-email forwarding changes.
 - PSR-16 JWKS caching, strict network bounds, one JWKS retry, stale-key fallback,
@@ -132,6 +133,10 @@ if (!hash_equals($callbackIdentity->subject, $identity->subject)) {
 // Use this as the stable provider identity. Never use email as the key.
 $appleSubject = $identity->subject;
 
+// The callback `user` object is browser-posted and is not signed. This helper
+// returns its email only when it matches the verified identity-token email.
+$verifiedProfileEmail = $callback->user?->verifiedEmail($identity);
+
 // Apple only supplies the name on the first authorization. Persist it now.
 // It is user-controlled text: escape it for the eventual output context.
 $firstName = $callback->user?->firstName;
@@ -172,31 +177,32 @@ $notifications = new AppleNotificationVerifier(
 
 $event = $notifications->verify($_POST['payload']);
 
-// This application function must insert jwtId under a UNIQUE constraint and
-// apply the account change in the same database transaction. If the transaction
-// fails, do not record jwtId; Apple can then retry safely.
-processAppleEventOnce($event->jwtId, function () use ($event): void {
-    match ($event->type) {
-        AppleAccountEvent::CONSENT_REVOKED => disconnectApple($event->subject),
-        AppleAccountEvent::ACCOUNT_DELETED => deleteOrAnonymizeUser($event->subject),
-        AppleAccountEvent::EMAIL_DISABLED => disableRelayMail($event->subject),
-        AppleAccountEvent::EMAIL_ENABLED => enableRelayMail($event->subject),
-    };
-});
+// Before returning success, insert the verified event into a durable inbox or
+// queue under a UNIQUE constraint on jwtId. A worker can then retry processing
+// locally and idempotently until the account change succeeds.
+enqueueAppleEventOnce($event);
+
+http_response_code(204);
 ```
 
-PSR-16 cannot express an atomic insert-if-absent operation and cannot commit the
-replay marker together with your account mutation. Use a database unique key on
-`jwtId` in the same transaction as the handler. Return a non-success HTTP status
-when verification or processing fails so Apple can retry.
+Apple describes each event as expected to be delivered once. Duplicate events
+may occur, but they are not a redelivery guarantee. Commit durable intake before
+returning a success status, retry account mutations from your own queue, and use
+monitoring plus reconciliation where possible. If verification or durable intake
+fails, return a non-success status and alert; do not rely on Apple to send the
+event again. See [Apple's DTS guidance on notification delivery](https://developer.apple.com/forums/thread/809509).
+
+PSR-16 cannot express an atomic insert-if-absent operation. Use a database or
+durable queue with a unique key on `jwtId` for inbox idempotency.
 
 ## Resilience and telemetry
 
 JWKS responses are fresh for one hour and retained as a stale fallback for 24
-hours. A random unknown key ID can trigger at most one shared refresh per minute.
-`FlockRefreshLock` additionally serializes refreshes between PHP-FPM workers on
-the same filesystem. Distributed deployments can implement `RefreshLock` using
-their existing Redis or database lock.
+hours. Successful and failed refresh attempts enter the forced-refresh cooldown,
+so repeated unknown key IDs cannot cause sequential network requests every time.
+Configure `FlockRefreshLock` to make this protection atomic between PHP-FPM
+workers on the same filesystem. Distributed deployments can implement
+`RefreshLock` using their existing Redis or database lock.
 
 Implement `Observer` to forward safe events such as `jwks.cache_hit`,
 `jwks.stale_fallback`, `oauth.token_succeeded`, and `oauth.token_rejected` to

@@ -6,11 +6,18 @@ namespace SafeApple\SignIn;
 
 use SafeApple\SignIn\Exception\InvalidAuthorizationResponse;
 
+/**
+ * Browser-posted first-authorization profile data.
+ *
+ * These values are not identity proof. Treat names as user-controlled text and
+ * use email only after matching it to an AppleIdentity returned by the verifier.
+ */
 final class AppleUserProfile
 {
     public function __construct(
         public readonly ?string $firstName,
         public readonly ?string $lastName,
+        /** Browser-posted email; never use it as an account identifier. */
         public readonly ?string $email,
     ) {
     }
@@ -35,6 +42,26 @@ final class AppleUserProfile
             lastName: self::optionalString($name['lastName'] ?? null),
             email: self::optionalString($data['email'] ?? null),
         );
+    }
+
+    /**
+     * Return the profile email only when it matches a verified identity token.
+     *
+     * Pass an AppleIdentity returned by AppleIdentityTokenVerifier, not one
+     * constructed from unverified claims.
+     */
+    public function verifiedEmail(AppleIdentity $identity): ?string
+    {
+        if ($this->email === null) {
+            return null;
+        }
+        if ($identity->email === null || !hash_equals($identity->email, $this->email)) {
+            throw new InvalidAuthorizationResponse(
+                'Apple callback profile email does not match the verified identity token.',
+            );
+        }
+
+        return $identity->email;
     }
 
     private static function optionalString(mixed $value): ?string
