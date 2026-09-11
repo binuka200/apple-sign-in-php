@@ -4,7 +4,7 @@
     "type": "library",
     "license": "MIT",
     "homepage": "https://github.com/binuka200/apple-sign-in-php",
-    "keywords": ["apple", "sign-in", "oauth", "oidc", "jwt"],
+    "keywords": ["apple", "apple-id", "sign-in", "sign-in-with-apple", "authentication", "oauth", "oauth2", "oidc", "openid-connect", "jwt"],
     "authors": [
         {
             "name": "binuka200",
