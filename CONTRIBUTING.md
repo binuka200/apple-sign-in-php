@@ -29,9 +29,13 @@ in separate namespaces.
 ## Compatibility
 
 The package supports the PHP and dependency versions declared in
-`composer.json`. New public APIs should preserve backward compatibility within
-a release line. Before 1.0, any necessary breaking change must be documented in
-the changelog.
+`composer.json`. From 1.0 onward, the public API is stable: renaming or
+reordering a parameter, renaming a property, or removing a type requires a major
+release. New optional parameters are appended, never inserted. Types marked
+`@internal` are exempt.
+
+When a change affects the public API, say so in the pull request and in
+`CHANGELOG.md`.
 
 ## Coverage
 

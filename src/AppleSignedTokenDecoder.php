@@ -12,7 +12,12 @@ use SafeApple\SignIn\Exception\InvalidIdentityToken;
 use SafeApple\SignIn\Exception\UnknownKeyId;
 use Throwable;
 
-/** Verifies Apple's signature and registered time claims without applying token-type claims. */
+/**
+ * Verifies Apple's signature and registered time claims without applying token-type claims.
+ *
+ * @internal Shared by AppleIdentityTokenVerifier and AppleNotificationVerifier.
+ *           Not covered by this package's backward-compatibility promise.
+ */
 final class AppleSignedTokenDecoder
 {
     public const MAX_TOKEN_BYTES = 65_536;

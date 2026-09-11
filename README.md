@@ -266,9 +266,19 @@ composer coverage
 
 ## Versioning and support
 
-Releases follow [Semantic Versioning](https://semver.org/). Before 1.0, minor
-releases may include documented breaking changes; patch releases are intended
-to remain backward compatible. Only the latest release receives security fixes.
+Releases follow [Semantic Versioning](https://semver.org/). From 1.0 onward,
+breaking changes to the public API happen only in a major release. Only the
+latest release receives security fixes.
+
+The public API is every type under the `SafeApple\SignIn` namespace except those
+marked `@internal`, which are implementation details shared between components
+and may change in any release. Because PHP supports named arguments, constructor
+and method **parameter names are part of the public API** as well as their order
+and types; new optional parameters are only ever appended.
+
+Adding a property to a returned value object (`AppleIdentity`, `AppleAccountEvent`,
+`TokenResponse`) is treated as a compatible change, so match on the properties you
+use rather than destructuring every field.
 
 Each GitHub release ships a source archive with a SHA-256 checksum and a
 Sigstore build-provenance attestation produced by the release workflow. To
