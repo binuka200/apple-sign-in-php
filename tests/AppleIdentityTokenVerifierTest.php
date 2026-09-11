@@ -7,6 +7,7 @@ namespace SafeApple\SignIn\Tests;
 use Firebase\JWT\JWT;
 use PHPUnit\Framework\TestCase;
 use SafeApple\SignIn\AppleIdentityTokenVerifier;
+use SafeApple\SignIn\AppleSignedTokenDecoder;
 use SafeApple\SignIn\Exception\InvalidIdentityToken;
 use SafeApple\SignIn\Exception\UnknownKeyId;
 use SafeApple\SignIn\Tests\Support\SequenceJwksProvider;
@@ -220,6 +221,157 @@ final class AppleIdentityTokenVerifierTest extends TestCase
             self::assertStringContainsString('too large', $exception->getMessage());
             self::assertSame([], $provider->calls);
         }
+    }
+
+    public function testItRejectsATokenSignedByAKeyApplePublishesNoKeyFor(): void
+    {
+        $resource = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+        self::assertNotFalse($resource);
+        $foreignKey = '';
+        self::assertTrue(openssl_pkey_export($resource, $foreignKey));
+        $forged = JWT::encode([
+            'iss' => AppleIdentityTokenVerifier::ISSUER,
+            'aud' => 'com.example.app',
+            'sub' => 'apple-user-123',
+            'iat' => time(),
+            'exp' => time() + 300,
+        ], $foreignKey, 'RS256', 'current-key');
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleIdentityTokenVerifier($provider, 'com.example.app');
+
+        $this->expectException(InvalidIdentityToken::class);
+        $this->expectExceptionMessage('signature or registered time claims are invalid');
+        $verifier->verify($forged);
+    }
+
+    public function testItRejectsAnExpiredToken(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleIdentityTokenVerifier($provider, 'com.example.app');
+
+        $this->expectException(InvalidIdentityToken::class);
+        $this->expectExceptionMessage('signature or registered time claims are invalid');
+        $verifier->verify($this->token(['iat' => time() - 600, 'exp' => time() - 300]));
+    }
+
+    public function testItRejectsAMalformedTokenBeforeFetchingKeys(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleIdentityTokenVerifier($provider, 'com.example.app');
+
+        try {
+            $verifier->verify('header.payload');
+            self::fail('Expected a malformed-token failure.');
+        } catch (InvalidIdentityToken $exception) {
+            self::assertStringContainsString('malformed', $exception->getMessage());
+            self::assertSame([], $provider->calls);
+        }
+    }
+
+    public function testItRejectsAHeaderWithoutAKeyId(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleIdentityTokenVerifier($provider, 'com.example.app');
+        $token = $this->encodedHeader(['alg' => 'RS256']).'.'.self::base64Url('{}').'.';
+
+        try {
+            $verifier->verify($token);
+            self::fail('Expected a missing-kid failure.');
+        } catch (InvalidIdentityToken $exception) {
+            self::assertStringContainsString('kid or alg', $exception->getMessage());
+            self::assertSame([], $provider->calls);
+        }
+    }
+
+    public function testItRejectsATokenWithoutASubject(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleIdentityTokenVerifier($provider, 'com.example.app');
+
+        $this->expectException(InvalidIdentityToken::class);
+        $this->expectExceptionMessage('no subject');
+        $verifier->verify($this->token(['sub' => '']));
+    }
+
+    public function testItRejectsAnAudienceClaimThatIsNotAStringOrList(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleIdentityTokenVerifier($provider, 'com.example.app');
+
+        $this->expectException(InvalidIdentityToken::class);
+        $this->expectExceptionMessage('not intended for this application');
+        $verifier->verify($this->token(['aud' => ['primary' => 'com.example.app']]));
+    }
+
+    public function testItRejectsAnAuthorizedPartyOutsideTheAudienceClaim(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleIdentityTokenVerifier($provider, ['com.example.app', 'com.example.web']);
+
+        $this->expectException(InvalidIdentityToken::class);
+        $this->expectExceptionMessage('not intended for this application');
+        $verifier->verify($this->token(['aud' => ['com.example.app'], 'azp' => 'com.example.web']));
+    }
+
+    public function testItRejectsAnEmptyAuthorizationCode(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleIdentityTokenVerifier($provider, 'com.example.app');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $verifier->verifyAuthorizationResponse($this->token(), '');
+    }
+
+    public function testItRequiresAtLeastOneNonEmptyAudience(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('non-empty Apple audience');
+        new AppleIdentityTokenVerifier(new SequenceJwksProvider(['keys' => [$this->jwk]]), ['', 42]);
+    }
+
+    public function testItRejectsLeewayApplesClockSkewNeverNeeds(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('between 0 and 300 seconds');
+        new AppleIdentityTokenVerifier(new SequenceJwksProvider(['keys' => [$this->jwk]]), 'com.example.app', 301);
+    }
+
+    public function testTheDecoderRejectsLeewayOutsideTheAllowedRangeOnItsOwn(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new AppleSignedTokenDecoder(new SequenceJwksProvider(['keys' => [$this->jwk]]), -1);
+    }
+
+    public function testItReadsBooleanAndUnrecognizedEmailClaims(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleIdentityTokenVerifier($provider, 'com.example.app');
+
+        $identity = $verifier->verify(
+            $this->token(['email_verified' => true, 'is_private_email' => 'maybe']),
+            'expected-nonce',
+        );
+
+        self::assertTrue($identity->emailVerified);
+        self::assertNull($identity->isPrivateEmail);
+    }
+
+    public function testItRejectsHeadersThatCannotBeDecoded(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleIdentityTokenVerifier($provider, 'com.example.app');
+        $payload = self::base64Url('{}');
+
+        foreach (['aaaaa', '!!!!', self::base64Url('{not json')] as $header) {
+            try {
+                $verifier->verify($header.'.'.$payload.'.');
+                self::fail('Expected a malformed-header failure.');
+            } catch (InvalidIdentityToken $exception) {
+                self::assertStringContainsString('malformed', $exception->getMessage());
+            }
+        }
+
+        self::assertSame([], $provider->calls);
     }
 
     /** @param array<string, mixed> $overrides */

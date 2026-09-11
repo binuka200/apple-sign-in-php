@@ -111,6 +111,130 @@ final class AppleNotificationVerifierTest extends TestCase
         }
     }
 
+    public function testItRejectsANotificationWithoutAnEventPayload(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, 'com.example.web');
+
+        $this->expectException(InvalidNotification::class);
+        $this->expectExceptionMessage('no event payload');
+        $verifier->verify($this->notification([], ['events' => null]));
+    }
+
+    public function testItRejectsMalformedEventJson(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, 'com.example.web');
+
+        $this->expectException(InvalidNotification::class);
+        $this->expectExceptionMessage('event JSON is malformed');
+        $verifier->verify($this->notification([], ['events' => '{"type":']));
+    }
+
+    public function testItRejectsAnEventPayloadThatIsNotAnObject(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, 'com.example.web');
+
+        $this->expectException(InvalidNotification::class);
+        $this->expectExceptionMessage('event must be an object');
+        $verifier->verify($this->notification([], ['events' => '"email-disabled"']));
+    }
+
+    public function testItAcceptsAnEventDeliveredAsAnObjectRatherThanAString(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, 'com.example.web');
+
+        $event = $verifier->verify($this->notification([], ['events' => [
+            'type' => AppleAccountEvent::ACCOUNT_DELETED,
+            'sub' => 'apple-user-123',
+            'event_time' => time(),
+            'is_private_email' => true,
+        ]]));
+
+        self::assertSame(AppleAccountEvent::ACCOUNT_DELETED, $event->type);
+        self::assertTrue($event->isPrivateEmail);
+        self::assertNull($event->email);
+    }
+
+    public function testItRejectsAnAuthorizedPartyOutsideTheAudienceClaim(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, ['com.example.web', 'com.example.app']);
+
+        $this->expectException(InvalidNotification::class);
+        $this->expectExceptionMessage('audience is invalid');
+        $verifier->verify($this->notification([], [
+            'aud' => ['com.example.web'],
+            'azp' => 'com.example.app',
+        ]));
+    }
+
+    public function testItRejectsANotificationWithoutAJwtId(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, 'com.example.web');
+
+        $this->expectException(InvalidNotification::class);
+        $this->expectExceptionMessage('freshness claims');
+        $verifier->verify($this->notification([], ['jti' => '']));
+    }
+
+    public function testItRequiresAtLeastOneNotificationAudience(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('notification audience');
+        new AppleNotificationVerifier(new SequenceJwksProvider(['keys' => [$this->jwk]]), []);
+    }
+
+    public function testItRejectsAMaximumAgeShorterThanAppleRetries(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('at least 60 seconds');
+        new AppleNotificationVerifier(new SequenceJwksProvider(['keys' => [$this->jwk]]), 'com.example.web', 30, 59);
+    }
+
+    public function testItRejectsANotificationFromAnotherIssuer(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, 'com.example.web');
+
+        $this->expectException(InvalidNotification::class);
+        $this->expectExceptionMessage('issuer is invalid');
+        $verifier->verify($this->notification([], ['iss' => 'https://accounts.google.com']));
+    }
+
+    public function testItRejectsAnAudienceClaimThatIsNotAStringOrList(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, 'com.example.web');
+
+        $this->expectException(InvalidNotification::class);
+        $this->expectExceptionMessage('audience is invalid');
+        $verifier->verify($this->notification([], ['aud' => ['primary' => 'com.example.web']]));
+    }
+
+    public function testItRejectsMultipleAudiencesWithoutAnAuthorizedParty(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, ['com.example.web', 'com.example.app']);
+
+        $this->expectException(InvalidNotification::class);
+        $this->expectExceptionMessage('audience is invalid');
+        $verifier->verify($this->notification([], ['aud' => ['com.example.web', 'com.example.app']]));
+    }
+
+    public function testItReadsAStringPrivateEmailFlag(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, 'com.example.web');
+
+        $event = $verifier->verify($this->notification(['is_private_email' => 'false']));
+
+        self::assertFalse($event->isPrivateEmail);
+    }
+
     /** @param array<string, mixed> $eventOverrides
      *  @param array<string, mixed> $claimOverrides
      */

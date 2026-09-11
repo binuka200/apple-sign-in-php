@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Raised test coverage of `src` from 77% to over 99%, adding regression tests for
+  forged and malformed token signatures, unmatched authorized parties, missing
+  subjects, malformed callback and notification payloads, client-secret key
+  handling, JWKS refresh-lock contention, and OAuth network and revocation failures.
+
 ## 0.1.2 - 2026-09-11
 
 - Added a release workflow that publishes a checksummed source archive with a

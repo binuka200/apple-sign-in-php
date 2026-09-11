@@ -32,13 +32,25 @@ if ($statements === 0) {
 $percentage = $covered / $statements * 100;
 
 $perFile = [];
+$uncovered = [];
 foreach ($clover->xpath('//file') ?: [] as $file) {
     $fileStatements = (int) $file->metrics['statements'];
     if ($fileStatements === 0) {
         continue;
     }
 
-    $perFile[basename((string) $file['name'])] = (int) $file->metrics['coveredstatements'] / $fileStatements * 100;
+    $name = basename((string) $file['name']);
+    $perFile[$name] = (int) $file->metrics['coveredstatements'] / $fileStatements * 100;
+
+    $lines = [];
+    foreach ($file->line as $line) {
+        if ((string) $line['type'] === 'stmt' && (int) $line['count'] === 0) {
+            $lines[] = (int) $line['num'];
+        }
+    }
+    if ($lines !== []) {
+        $uncovered[$name] = $lines;
+    }
 }
 
 asort($perFile);
@@ -47,6 +59,15 @@ printf("Line coverage: %.2f%% (%d/%d statements)\n", $percentage, $covered, $sta
 printf("Lowest covered files:\n");
 foreach (array_slice($perFile, 0, 5, true) as $name => $filePercentage) {
     printf("  %6.2f%%  %s\n", $filePercentage, $name);
+}
+
+if (getenv('COVERAGE_DETAIL') !== false) {
+    printf("Uncovered lines:\n");
+    foreach (array_keys($perFile) as $name) {
+        if (isset($uncovered[$name])) {
+            printf("  %s: %s\n", $name, implode(', ', $uncovered[$name]));
+        }
+    }
 }
 
 if ($minimum > 0 && $percentage + 0.005 < $minimum) {
