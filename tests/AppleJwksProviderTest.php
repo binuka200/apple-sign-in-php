@@ -211,6 +211,19 @@ final class AppleJwksProviderTest extends TestCase
         self::assertSame(1, $client->getRequestsCount());
     }
 
+    public function testTheWorkerThatWinsTheLockFetchesTheKeysItself(): void
+    {
+        $client = new MockHttpClient([new MockResponse(json_encode($this->keySet, JSON_THROW_ON_ERROR))]);
+        $lock = new StubRefreshLock(true);
+        $provider = new AppleJwksProvider(new ArrayCache(), $client, refreshLock: $lock);
+
+        self::assertSame($this->keySet, $provider->get());
+
+        self::assertSame(1, $client->getRequestsCount());
+        self::assertSame(1, $lock->acquired);
+        self::assertSame(1, $lock->released);
+    }
+
     public function testItRejectsCacheSettingsThatWouldWeakenKeyFreshness(): void
     {
         $cache = new ArrayCache();
