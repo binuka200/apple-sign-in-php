@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.1.1 - 2026-09-02
+
+- Rate-limited unsuccessful forced JWKS refreshes, including stale-only fallback paths.
+- Marked browser-posted callback profile data as untrusted and added
+  `AppleUserProfile::verifiedEmail()` matching against a verified identity token.
+- Replaced assumed Apple notification redelivery with durable-inbox and local-retry guidance.
+- Added regression coverage for failed refresh cooldowns and tampered callback email values.
+
 ## 0.1.0 - 2026-08-20
 
 - Complete Sign in with Apple authorization, token, refresh, and revocation flow.

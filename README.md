@@ -1,11 +1,19 @@
 # Safe Apple Sign In for PHP
 
+[![CI](https://github.com/binuka200/apple-sign-in-php/actions/workflows/ci.yml/badge.svg)](https://github.com/binuka200/apple-sign-in-php/actions/workflows/ci.yml)
+[![Latest Stable Version](https://img.shields.io/packagist/v/binuka200/apple-sign-in)](https://packagist.org/packages/binuka200/apple-sign-in)
+[![PHP Version](https://img.shields.io/packagist/dependency-v/binuka200/apple-sign-in/php)](https://packagist.org/packages/binuka200/apple-sign-in)
+[![License](https://img.shields.io/packagist/l/binuka200/apple-sign-in)](LICENSE)
+
 A framework-neutral, defensive implementation of the complete Sign in with
 Apple server lifecycle for PHP 8.1+.
 
 It replaces abandoned packages that vendor old JWT code or fetch Apple's keys
 on every login request. It does not create application sessions, users, routes,
 or database records; those decisions remain in your application.
+
+This is an independent community project and is not affiliated with or endorsed
+by Apple Inc.
 
 ## Included
 
@@ -218,13 +226,20 @@ secrets, or private keys.
 
 ## Failure behavior
 
-Every package failure extends `AppleSignInException`. Important subclasses are:
+Failures while communicating with Apple or verifying Apple data extend
+`AppleSignInException`. Important subclasses are:
 
 - `InvalidIdentityToken`, `UnknownKeyId`
 - `StateMismatch`, `InvalidAuthorizationResponse`
 - `AppleApiException`, `AppleApiUnavailable`
 - `InvalidNotification`
 - `JwksUnavailable`, `InvalidConfiguration`
+
+Invalid credential and endpoint configuration uses `InvalidConfiguration`.
+Other invalid method or constructor arguments use PHP's
+`InvalidArgumentException`. Infrastructure failures from an injected cache or
+refresh-lock implementation may retain the exception type supplied by that
+implementation.
 
 Map detailed failures to a generic login error at the public boundary. Never
 return raw Apple errors, tokens, codes, or claims to an unauthenticated client.
@@ -241,6 +256,12 @@ CI covers PHP 8.1 through 8.5, including the lowest supported dependency set.
 The codebase is checked at PHPStan level 8 and dependencies are audited for
 published security advisories. Use a PHP branch that still receives upstream
 security fixes in production.
+
+## Versioning and support
+
+Releases follow [Semantic Versioning](https://semver.org/). Before 1.0, minor
+releases may include documented breaking changes; patch releases are intended
+to remain backward compatible. Only the latest release receives security fixes.
 
 ## License
 

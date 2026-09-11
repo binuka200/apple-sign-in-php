@@ -5,6 +5,13 @@
     "license": "MIT",
     "homepage": "https://github.com/binuka200/apple-sign-in-php",
     "keywords": ["apple", "sign-in", "oauth", "oidc", "jwt"],
+    "authors": [
+        {
+            "name": "binuka200",
+            "homepage": "https://github.com/binuka200",
+            "role": "Developer"
+        }
+    ],
     "support": {
         "docs": "https://github.com/binuka200/apple-sign-in-php#readme",
         "issues": "https://github.com/binuka200/apple-sign-in-php/issues",
@@ -41,6 +48,22 @@
     },
     "config": {
         "sort-packages": true
+    },
+    "archive": {
+        "exclude": [
+            "/.github",
+            "/.phpstan.cache",
+            "/.phpunit.cache",
+            "/composer.lock",
+            "/docs/assets",
+            "/docs/medium-article.md",
+            "/phpstan.neon.dist",
+            "/phpunit.xml.dist",
+            "/security-audit",
+            "/tests",
+            "/tools",
+            "/vendor"
+        ]
     },
     "minimum-stability": "stable",
     "prefer-stable": true
