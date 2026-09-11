@@ -257,6 +257,13 @@ The codebase is checked at PHPStan level 8 and dependencies are audited for
 published security advisories. Use a PHP branch that still receives upstream
 security fixes in production.
 
+A separate job measures line coverage of `src` and fails when it drops below
+the committed floor:
+
+```bash
+composer coverage
+```
+
 ## Versioning and support
 
 Releases follow [Semantic Versioning](https://semver.org/). Before 1.0, minor
