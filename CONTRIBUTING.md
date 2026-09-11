@@ -49,6 +49,12 @@ Maintainers cut releases by pushing a signed `v*` tag; see
 [docs/RELEASING.md](docs/RELEASING.md). Changes to `main` must pass CI, and
 release tags cannot be moved or deleted once pushed.
 
+## Questions
+
+Usage questions belong in
+[Discussions](https://github.com/binuka200/apple-sign-in-php/discussions/categories/q-a)
+rather than the issue tracker, which stays a list of tracked work.
+
 ## Security reports
 
 Report suspected vulnerabilities through
