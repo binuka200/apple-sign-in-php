@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Declared the public API stable: every type under `SafeApple\SignIn` except those
+  marked `@internal` follows Semantic Versioning, including parameter names, which
+  named arguments make part of the contract.
+- Marked `AppleSignedTokenDecoder` as `@internal`; it is a detail shared by the
+  identity-token and notification verifiers.
+
 ## 0.1.4 - 2026-09-11
 
 - Release tags must now carry a verified signature; the release workflow fails
