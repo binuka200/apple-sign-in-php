@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added a release workflow that publishes a checksummed source archive with a
+  Sigstore build-provenance attestation for every `v*` tag.
+
 ## 0.1.1 - 2026-09-02
 
 - Rate-limited unsuccessful forced JWKS refreshes, including stale-only fallback paths.

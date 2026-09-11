@@ -33,6 +33,12 @@ The package supports the PHP and dependency versions declared in
 a release line. Before 1.0, any necessary breaking change must be documented in
 the changelog.
 
+## Releases
+
+Maintainers cut releases by pushing a signed `v*` tag; see
+[docs/RELEASING.md](docs/RELEASING.md). Changes to `main` must pass CI, and
+release tags cannot be moved or deleted once pushed.
+
 ## Security reports
 
 Report suspected vulnerabilities through
