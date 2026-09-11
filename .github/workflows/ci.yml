@@ -45,3 +45,5 @@ jobs:
           coverage: pcov
       - run: composer install --no-interaction --prefer-dist
       - run: composer coverage
+        env:
+          COVERAGE_DETAIL: '1'
