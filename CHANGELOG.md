@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.3 - 2026-09-11
+
 - Raised test coverage of `src` from 77% to over 99%, adding regression tests for
   forged and malformed token signatures, unmatched authorized parties, missing
   subjects, malformed callback and notification payloads, client-secret key
