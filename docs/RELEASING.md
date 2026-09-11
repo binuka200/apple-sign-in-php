@@ -28,12 +28,12 @@ rather than by retagging.
 3. Create a signed, annotated tag and push it:
 
    ```bash
-   git tag -s v0.1.2 -m "v0.1.2"
-   git push origin v0.1.2
+   git tag -s v0.1.4 -m "v0.1.4"
+   git push origin v0.1.4
    ```
 
-4. The workflow validates the tag name, reports whether the tag signature
-   verifies, builds `apple-sign-in-php-<version>.tar.gz` (respecting
+4. The workflow validates the tag name, fails unless the tag carries a verified
+   signature, builds `apple-sign-in-php-<version>.tar.gz` (respecting
    `.gitattributes` export rules), attaches its SHA-256 checksum, attests build
    provenance, and creates the release with the matching changelog section as
    release notes.
@@ -65,38 +65,57 @@ sha256sum -c apple-sign-in-php-0.1.2.tar.gz.sha256
 ### Tag signatures (maintainer key)
 
 Signed tags prove the maintainer, not just the runner, authorized the version.
-Set this up once with either an SSH or a GPG key.
+The release workflow **fails** when a tag is unsigned or its signature does not
+verify, so this must be in place before cutting a release.
 
-SSH signing (simplest if a GitHub SSH key already exists):
-
-```bash
-git config --global gpg.format ssh
-git config --global user.signingkey ~/.ssh/id_ed25519.pub
-git config --global tag.gpgSign true
-```
-
-GPG signing:
+This repository is configured for SSH signing with a dedicated key:
 
 ```bash
-gpg --full-generate-key            # Ed25519 or RSA 4096, with a passphrase
-gpg --list-secret-keys --keyid-format=long
-git config --global user.signingkey <KEY_ID>
-git config --global tag.gpgSign true
-gpg --armor --export <KEY_ID>      # add this at github.com/settings/keys
+git config --local gpg.format ssh
+git config --local user.signingkey ~/.ssh/id_ed25519_signing.pub
+git config --local tag.gpgSign true
+git config --local gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers
 ```
 
-The public key must be registered on GitHub (SSH keys as a *signing* key, GPG
-keys under GPG keys) for the tag to show as **Verified** and for the workflow's
-signature check to pass.
-
-Until a signing key is registered, the `Check tag signature` step only emits a
-warning so releases are not blocked. Once signing is in place, make it binding
-by replacing the `::warning::` line in that step with:
+Setting up the key on a new machine:
 
 ```bash
-echo "::error::Tag $TAG has no verified signature (reason: $reason)."
-exit 1
+ssh-keygen -t ed25519 -C "you@example.com" -f ~/.ssh/id_ed25519_signing
+gh auth refresh -h github.com -s admin:ssh_signing_key
+gh ssh-key add ~/.ssh/id_ed25519_signing.pub --type signing --title "release signing"
 ```
+
+The key must be registered with `--type signing`. An authentication key of the
+same value does not make tags verify.
+
+Load the key once per machine so signing does not prompt for the passphrase on
+every tag (on macOS this stores it in the Keychain and survives reboots):
+
+```bash
+ssh-add --apple-use-keychain ~/.ssh/id_ed25519_signing
+```
+
+`~/.ssh/allowed_signers` maps the signing key to the git identities that use it,
+which is what lets `git tag -v v0.1.4` verify locally:
+
+```
+binuka200@users.noreply.github.com ssh-ed25519 AAAA...
+you@example.com ssh-ed25519 AAAA...
+```
+
+To confirm GitHub accepts a signature, check the tag object after pushing:
+
+```bash
+sha="$(gh api repos/binuka200/apple-sign-in-php/git/ref/tags/v0.1.4 --jq '.object.sha')"
+gh api "repos/binuka200/apple-sign-in-php/git/tags/$sha" --jq '.verification'
+```
+
+GPG signing works equally well if preferred; set `user.signingkey` to the key id,
+leave `gpg.format` unset, and upload the armored public key under GPG keys.
+
+Tags pushed before signing was configured (`v0.1.0` through `v0.1.3`) remain
+unsigned. Tag protection makes them immutable, and signing them after the fact
+would misrepresent when they were authorized.
 
 ## Packagist
 
