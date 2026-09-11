@@ -33,6 +33,12 @@ The package supports the PHP and dependency versions declared in
 a release line. Before 1.0, any necessary breaking change must be documented in
 the changelog.
 
+## Coverage
+
+`composer coverage` reports line coverage of `src` and fails below the floor
+committed in `composer.json`. New code should not lower it; raise the floor
+when coverage improves.
+
 ## Releases
 
 Maintainers cut releases by pushing a signed `v*` tag; see

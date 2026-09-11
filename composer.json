@@ -44,7 +44,7 @@
         "test": "phpunit",
         "coverage": [
             "@php vendor/bin/phpunit --coverage-clover=.phpunit.cache/clover.xml",
-            "@php tools/coverage-check.php .phpunit.cache/clover.xml"
+            "@php tools/coverage-check.php .phpunit.cache/clover.xml 77"
         ],
         "lint": "@php tools/lint.php",
         "analyse": "phpstan analyse --no-progress --memory-limit=512M --debug",
