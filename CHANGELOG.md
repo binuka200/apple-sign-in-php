@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Release tags must now carry a verified signature; the release workflow fails
+  on unsigned or lightweight tags.
+
 ## 0.1.3 - 2026-09-11
 
 - Raised test coverage of `src` from 77% to over 99%, adding regression tests for

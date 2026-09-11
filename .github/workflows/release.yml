@@ -36,17 +36,18 @@ jobs:
         run: |
           object_type="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.type')"
           if [ "$object_type" != "tag" ]; then
-            echo "::warning::$TAG is a lightweight tag, so it carries no signature. Use 'git tag -s' for signed release tags."
-            exit 0
+            echo "::error::$TAG is a lightweight tag, so it carries no signature. Release tags must be created with 'git tag -s'."
+            exit 1
           fi
           sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.sha')"
-          verified="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq '.verification.verified')"
-          reason="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq '.verification.reason')"
-          if [ "$verified" = "true" ]; then
-            echo "Tag $TAG carries a verified signature."
-          else
-            echo "::warning::Tag $TAG has no verified signature (reason: $reason). See docs/RELEASING.md."
+          verification="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq '.verification')"
+          verified="$(printf '%s' "$verification" | jq -r '.verified')"
+          reason="$(printf '%s' "$verification" | jq -r '.reason')"
+          if [ "$verified" != "true" ]; then
+            echo "::error::Tag $TAG has no verified signature (reason: $reason). See docs/RELEASING.md."
+            exit 1
           fi
+          echo "Tag $TAG carries a verified signature."
 
       - name: Build release archive
         env:
