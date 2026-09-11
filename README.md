@@ -263,6 +263,18 @@ Releases follow [Semantic Versioning](https://semver.org/). Before 1.0, minor
 releases may include documented breaking changes; patch releases are intended
 to remain backward compatible. Only the latest release receives security fixes.
 
+Each GitHub release ships a source archive with a SHA-256 checksum and a
+Sigstore build-provenance attestation produced by the release workflow. To
+confirm an archive was built from this repository:
+
+```bash
+gh attestation verify apple-sign-in-php-<version>.tar.gz --repo binuka200/apple-sign-in-php
+sha256sum -c apple-sign-in-php-<version>.tar.gz.sha256
+```
+
+Release tags are protected against deletion and rewriting, so a published
+version always points at the same commit.
+
 ## License
 
 MIT

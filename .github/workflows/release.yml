@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag name
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Tag '$TAG' is not a valid release tag (expected vMAJOR.MINOR.PATCH[-prerelease])."
+            exit 1
+          fi
+
+      - name: Check tag signature
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          object_type="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.type')"
+          if [ "$object_type" != "tag" ]; then
+            echo "::warning::$TAG is a lightweight tag, so it carries no signature. Use 'git tag -s' for signed release tags."
+            exit 0
+          fi
+          sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.sha')"
+          verified="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq '.verification.verified')"
+          reason="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq '.verification.reason')"
+          if [ "$verified" = "true" ]; then
+            echo "Tag $TAG carries a verified signature."
+          else
+            echo "::warning::Tag $TAG has no verified signature (reason: $reason). See docs/RELEASING.md."
+          fi
+
+      - name: Build release archive
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          prefix="apple-sign-in-php-${TAG#v}"
+          git archive --format=tar.gz --prefix="$prefix/" -o "dist/$prefix.tar.gz" "$TAG"
+          (cd dist && sha256sum "$prefix.tar.gz" > "$prefix.tar.gz.sha256")
+          cat "dist/$prefix.tar.gz.sha256"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.tar.gz
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          notes_flag=--generate-notes
+          if grep -q "^## \[\?${TAG#v}\]\?" CHANGELOG.md 2>/dev/null; then
+            awk -v v="${TAG#v}" '
+              $0 ~ "^## \\[?" v "\\]?" { found = 1; next }
+              found && /^## / { exit }
+              found { print }
+            ' CHANGELOG.md > dist/notes.md
+            [ -s dist/notes.md ] && notes_flag="--notes-file=dist/notes.md"
+          fi
+          prerelease=""
+          case "$TAG" in *-*) prerelease="--prerelease";; esac
+          gh release create "$TAG" \
+            dist/*.tar.gz dist/*.sha256 \
+            --title "$TAG" \
+            $notes_flag $prerelease
