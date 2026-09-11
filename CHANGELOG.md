@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+## 0.1.4 - 2026-09-11
+
 - Release tags must now carry a verified signature; the release workflow fails
   on unsigned or lightweight tags.
+- Removed a stray `.DS_Store` file from the distributed archive.
 
 ## 0.1.3 - 2026-09-11
 
