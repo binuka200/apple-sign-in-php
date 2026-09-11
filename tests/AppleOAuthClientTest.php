@@ -7,8 +7,11 @@ namespace SafeApple\SignIn\Tests;
 use PHPUnit\Framework\TestCase;
 use SafeApple\SignIn\AppleOAuthClient;
 use SafeApple\SignIn\Exception\AppleApiException;
+use SafeApple\SignIn\Exception\AppleApiUnavailable;
+use SafeApple\SignIn\Exception\InvalidConfiguration;
 use SafeApple\SignIn\Tests\Support\RecordingObserver;
 use SafeApple\SignIn\Tests\Support\StaticClientSecret;
+use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -81,5 +84,121 @@ final class AppleOAuthClientTest extends TestCase
         $oauth->revoke('refresh-token');
 
         self::assertSame(1, $client->getRequestsCount());
+    }
+
+    public function testItSurfacesAFailedRevocation(): void
+    {
+        $observer = new RecordingObserver();
+        $client = new MockHttpClient(new MockResponse('{"error":"invalid_client"}', ['http_code' => 401]));
+        $oauth = new AppleOAuthClient('com.example.web', new StaticClientSecret(), $client, $observer);
+
+        try {
+            $oauth->revoke('refresh-token');
+            self::fail('Expected Apple to reject the revocation.');
+        } catch (AppleApiException $exception) {
+            self::assertSame('invalid_client', $exception->appleError);
+            self::assertSame(401, $exception->httpStatus);
+            self::assertSame('oauth.revoke_rejected', $observer->records[0]['event']);
+        }
+    }
+
+    public function testItReportsARevocationThatNeverReachedApple(): void
+    {
+        $observer = new RecordingObserver();
+        $client = new MockHttpClient(static function (): MockResponse {
+            throw new TransportException('Connection timed out.');
+        });
+        $oauth = new AppleOAuthClient('com.example.web', new StaticClientSecret(), $client, $observer);
+
+        try {
+            $oauth->revoke('refresh-token');
+            self::fail('Expected a network failure.');
+        } catch (AppleApiUnavailable $exception) {
+            self::assertStringContainsString('network bound', $exception->getMessage());
+            self::assertSame('oauth.network_failed', $observer->records[0]['event']);
+        }
+    }
+
+    public function testItReportsATokenRequestThatNeverReachedApple(): void
+    {
+        $observer = new RecordingObserver();
+        $client = new MockHttpClient(static function (): MockResponse {
+            throw new TransportException('Connection timed out.');
+        });
+        $oauth = new AppleOAuthClient('com.example.web', new StaticClientSecret(), $client, $observer);
+
+        try {
+            $oauth->exchangeAuthorizationCode('one-time-code');
+            self::fail('Expected a network failure.');
+        } catch (AppleApiUnavailable $exception) {
+            self::assertStringContainsString('network bound', $exception->getMessage());
+            self::assertSame('oauth.network_failed', $observer->records[0]['event']);
+            self::assertSame('token', $observer->records[0]['context']['operation']);
+        }
+    }
+
+    public function testItRejectsAMalformedTokenResponse(): void
+    {
+        $client = new MockHttpClient(new MockResponse(json_encode([
+            'access_token' => 'access',
+            'token_type' => 'Bearer',
+            'expires_in' => 3600,
+        ], JSON_THROW_ON_ERROR)));
+        $oauth = new AppleOAuthClient('com.example.web', new StaticClientSecret(), $client);
+
+        $this->expectException(AppleApiUnavailable::class);
+        $this->expectExceptionMessage('malformed token response');
+        $oauth->exchangeAuthorizationCode('one-time-code');
+    }
+
+    public function testItRejectsARefreshResponseWithoutAnIdentityToken(): void
+    {
+        $client = new MockHttpClient(new MockResponse(json_encode([
+            'access_token' => 'access',
+            'token_type' => 'Bearer',
+            'expires_in' => 3600,
+            'id_token' => '',
+        ], JSON_THROW_ON_ERROR)));
+        $oauth = new AppleOAuthClient('com.example.web', new StaticClientSecret(), $client);
+
+        $this->expectException(AppleApiUnavailable::class);
+        $oauth->refresh('refresh-token');
+    }
+
+    public function testItRejectsEmptyCredentialsBeforeCallingApple(): void
+    {
+        $client = new MockHttpClient(new MockResponse(''));
+        $oauth = new AppleOAuthClient('com.example.web', new StaticClientSecret(), $client);
+
+        $calls = [
+            static function () use ($oauth): void {
+                $oauth->exchangeAuthorizationCode('');
+            },
+            static function () use ($oauth): void {
+                $oauth->refresh('');
+            },
+            static function () use ($oauth): void {
+                $oauth->revoke('');
+            },
+            static function () use ($oauth): void {
+                $oauth->revoke('refresh-token', 'id_token');
+            },
+        ];
+
+        foreach ($calls as $call) {
+            try {
+                $call();
+                self::fail('Expected the empty or unsupported argument to be rejected.');
+            } catch (\InvalidArgumentException) {
+            }
+        }
+
+        self::assertSame(0, $client->getRequestsCount());
+    }
+
+    public function testItRequiresAClientId(): void
+    {
+        $this->expectException(InvalidConfiguration::class);
+        new AppleOAuthClient('', new StaticClientSecret(), new MockHttpClient(new MockResponse('')));
     }
 }

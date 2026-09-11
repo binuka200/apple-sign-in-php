@@ -195,6 +195,46 @@ final class AppleNotificationVerifierTest extends TestCase
         new AppleNotificationVerifier(new SequenceJwksProvider(['keys' => [$this->jwk]]), 'com.example.web', 30, 59);
     }
 
+    public function testItRejectsANotificationFromAnotherIssuer(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, 'com.example.web');
+
+        $this->expectException(InvalidNotification::class);
+        $this->expectExceptionMessage('issuer is invalid');
+        $verifier->verify($this->notification([], ['iss' => 'https://accounts.google.com']));
+    }
+
+    public function testItRejectsAnAudienceClaimThatIsNotAStringOrList(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, 'com.example.web');
+
+        $this->expectException(InvalidNotification::class);
+        $this->expectExceptionMessage('audience is invalid');
+        $verifier->verify($this->notification([], ['aud' => ['primary' => 'com.example.web']]));
+    }
+
+    public function testItRejectsMultipleAudiencesWithoutAnAuthorizedParty(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, ['com.example.web', 'com.example.app']);
+
+        $this->expectException(InvalidNotification::class);
+        $this->expectExceptionMessage('audience is invalid');
+        $verifier->verify($this->notification([], ['aud' => ['com.example.web', 'com.example.app']]));
+    }
+
+    public function testItReadsAStringPrivateEmailFlag(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleNotificationVerifier($provider, 'com.example.web');
+
+        $event = $verifier->verify($this->notification(['is_private_email' => 'false']));
+
+        self::assertFalse($event->isPrivateEmail);
+    }
+
     /** @param array<string, mixed> $eventOverrides
      *  @param array<string, mixed> $claimOverrides
      */

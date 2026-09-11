@@ -356,6 +356,24 @@ final class AppleIdentityTokenVerifierTest extends TestCase
         self::assertNull($identity->isPrivateEmail);
     }
 
+    public function testItRejectsHeadersThatCannotBeDecoded(): void
+    {
+        $provider = new SequenceJwksProvider(['keys' => [$this->jwk]]);
+        $verifier = new AppleIdentityTokenVerifier($provider, 'com.example.app');
+        $payload = self::base64Url('{}');
+
+        foreach (['aaaaa', '!!!!', self::base64Url('{not json')] as $header) {
+            try {
+                $verifier->verify($header.'.'.$payload.'.');
+                self::fail('Expected a malformed-header failure.');
+            } catch (InvalidIdentityToken $exception) {
+                self::assertStringContainsString('malformed', $exception->getMessage());
+            }
+        }
+
+        self::assertSame([], $provider->calls);
+    }
+
     /** @param array<string, mixed> $overrides */
     private function token(array $overrides = []): string
     {
