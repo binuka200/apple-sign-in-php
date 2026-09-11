@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.2 - 2026-09-11
+
 - Added a release workflow that publishes a checksummed source archive with a
   Sigstore build-provenance attestation for every `v*` tag.
 
