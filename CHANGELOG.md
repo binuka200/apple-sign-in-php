@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.0.0 - 2026-09-11
+
+First stable release. The Sign in with Apple lifecycle this package implements
+has been unchanged since 0.1.1; everything since has hardened its tests and
+release process.
+
 - Declared the public API stable: every type under `SafeApple\SignIn` except those
   marked `@internal` follows Semantic Versioning, including parameter names, which
   named arguments make part of the contract.
